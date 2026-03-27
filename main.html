@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>AgriTrade India: Market Intelligence Platform</title>
+<title>AgriTrade India — Market Intelligence Platform</title>
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&family=IBM+Plex+Mono:wght@400;500&family=Sora:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
   :root {
@@ -1126,11 +1126,11 @@
 
     <div class="modal-field">
       <label>data.gov.in API Key</label>
-      <input type="text" id="cfg-govdata-key" placeholder="579b464db66ec23bdd000001…" value="579b464db66ec23bdd0000013f8b18b742724d824e59ae8fc9eb068b">
+      <input type="text" id="cfg-govdata-key" placeholder="579b464db66ec23bdd000001…" value="">
     </div>
     <div class="modal-field">
       <label>Anthropic API Key (for AI features)</label>
-      <input type="text" id="cfg-anthropic-key" placeholder="sk-ant-api03-…" value="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">
+      <input type="text" id="cfg-anthropic-key" placeholder="sk-ant-api03-…" value="">
     </div>
 
     <div class="note-box">
@@ -1202,32 +1202,20 @@ async function fetchPrices() {
   const state = document.getElementById('state-filter').value;
   const commodity = document.getElementById('commodity-filter').value;
 
-  // data.gov.in resource ID for AgMarkNet daily prices
-  const RESOURCE_ID = '9ef84268-d588-465a-a308-a864a43d0070';
-  const BASE_URL = 'https://api.data.gov.in/resource/' + RESOURCE_ID;
-
-  // Build query params
+  // Route through our server-side proxy to avoid CORS
   const params = new URLSearchParams({
-    'api-version': '2.0',
-    format: 'json',
+    service: 'govdata',
     limit: 200,
     offset: 0
   });
 
-  if (config.govDataKey) {
-    params.set('api-key', config.govDataKey);
-  } else {
-    // Use a demo key approach — fall back to sample data
-    params.set('api-key', '579b464db66ec23bdd000001cdd3946e4a194af863ca6e3571ac2ac8');
-  }
-
-  if (state) params.set('filters[state]', state);
-  if (commodity) params.set('filters[commodity]', commodity);
+  if (state)     params.set('state', state);
+  if (commodity) params.set('commodity', commodity);
 
   let success = false;
 
   try {
-    const resp = await fetch(`${BASE_URL}?${params.toString()}`);
+    const resp = await fetch(`/api/proxy?${params.toString()}`);
 
     if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
 
@@ -1628,18 +1616,15 @@ Answer in clear, concise English. Use ₹ and Indian number formats (lakh, crore
   const thinkingEl = appendMsg('Analysing market data…', 'thinking');
 
   try {
-    if (!config.anthropicKey) {
-      throw new Error('No API key');
-    }
-
-    const resp = await fetch('https://api.anthropic.com/v1/messages', {
+    const resp = await fetch('/api/proxy', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
+        service: 'anthropic',
         model: 'claude-sonnet-4-20250514',
         max_tokens: 1000,
         system: systemPrompt,
-        messages: aiHistory.slice(-10) // keep last 10 for context
+        messages: aiHistory.slice(-10)
       })
     });
 
@@ -1655,8 +1640,8 @@ Answer in clear, concise English. Use ₹ and Indian number formats (lakh, crore
     thinkingEl.remove();
     const fallback = getFallbackResponse(userMsg);
     appendMsg(fallback, 'ai');
-    if (!config.anthropicKey) {
-      appendMsg('ℹ️ To enable real AI responses, add your Anthropic API key via the "Configure" button in the header.', 'ai');
+    if (err.message?.includes('500')) {
+      appendMsg('⚠️ AI is not configured on the server yet. Add ANTHROPIC_API_KEY to your Vercel environment variables.', 'ai');
     }
   }
 
